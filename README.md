@@ -50,6 +50,9 @@ It used to store defaults for calling one backup task. It is stored in python .c
 ## Installation:
 
 Prerequisities: `python3` and `python3-venv` (virtualenv) packages.
+You can create distributable `*bin.tgz` archive by running script `./build-zip.sh` in development directory.
+
+Installation procedure then consists of these steps:
 
     download file jzhb-1.0-bin.tgz
     tar xf jzhb-1.0-bin.tgz
