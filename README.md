@@ -22,13 +22,20 @@ manageable amount of backups.
 
 - **ORIGIN** - data volume - place(directory) of your files you want to backup
 - **BACKUP** - backup volume
-- **$BACKUP/mirror** - special directory on backup volume that is used to mirror BACKUP volume.
+- **$BACKUP/mirror** - special directory on backup volume that is used to mirror ORIGIN volume.
 - **$BACKUP/snapshot-XXX** - stored hard-linked snapshots, created by `cp -al $MIRROR $BACKUP/snapshot-$(date '+%Y%m%d%H%M')`
 
 In case that ORIGIN and BACKUP volume are stored
-on the same volume, MIRROR will not be used.
+on the same volume, MIRROR directory will not be used.
 In other cases we use rsync for maintaining MIRROR
 in sync with BACKUP. Same/different volume is checked by `df -P "%s" | awk 'END{print $1}'`
+
+In situation (**one volume**) that everything is located in the same volume, there si very little space overhead, because all backups are just hardlinks. In case that there are two different volumes (**two volumes**), there is a copy of everything in backup volume plus addition very efficient hardlinked snapshots. 
+
+- **one volume**:   `sizeof(BACKUP) = sizeof(SNAPSHOTS)`
+- **two volumes**:  `sizeof(BACKUP) = sizeof(ORIGIN)+sizeof(SNAPSHOTS)`
+
+**Note:** Please note that it is not supported if ORIGIN directory consists of various mountpoints. In such special case one can use option `--use_rsync` to force making rsync *BACKUP* mirror, otherwise it won't work properly.
 
 ## Configuration:
 
