@@ -4,7 +4,7 @@ from setuptools import setup
 setup(
     name='jzhb',
     version='1.0',
-    url='https://zahradil.info/git/jzhb',
+    url='https://github.com/zahradil/jzh-backup',
     author='Jiri Zahradil',
     author_email='jz@zahradil.info',
     py_modules=['jzhb'],

@@ -9,5 +9,5 @@ pip install *.whl
 
 ln -s $(realpath ./jzhb) ~/bin/jzhbck
 
-echo -e "Skript [jzhb] installed to ~/bin ."
-echo -e "Hotovo."
+echo -e "Script [jzhb] was installed to ~/bin ."
+echo -e "Done."
