@@ -4,7 +4,7 @@
 """
 (c) 2020 Jiri Zahradil, jz@zahradil.info
 
-Aplication for managing backups and snapshots created via hard-links.
+Application for managing backups and snapshots created via hard-links.
 
 Definitions:
 ------------
@@ -55,8 +55,8 @@ Configuration:
     rsync-options=""
 
 
-Instalation:
-------------
+Installation:
+-------------
 - it needs python3 and python3-venv (virtualenv) packages
 
 > download file jzhb-1.0-bin.tgz
@@ -79,9 +79,14 @@ Example:
 
 """
 
-import click, configparser
+import configparser
+import datetime as dt
+import os
+import os.path
+import shutil
 import subprocess
-import os, sys, os.path, re, datetime as dt, shutil
+
+import click
 
 NICE_PREFIX="nice ionice -c3 "
 
@@ -102,36 +107,35 @@ def parsedatestring(s):
     mn = int(s[10:12])
     return dt.datetime(year, mo, d, h, mn, 0, 0)
 
-def unlinkdir(dir):
+def unlinkdir(directory):
     try:
-        shutil.rmtree(dir, ignore_errors=True)
+        shutil.rmtree(directory, ignore_errors=True)
     except Exception as e:
-        click.echo("Exception during delete %s" % (str(e)))
+        click.echo(f"Exception during delete {str(e)}")
 
 def renamedir(fn1, fn2):
     try:
         os.rename(fn1, fn2)
     except Exception as e:
-        click.echo("Exception during rename %s" % (str(e)))
+        click.echo(f"Exception during rename {str(e)}")
 
 def carry_all_ops(backup_path, ops):
     # click.echo("carry_all_ops")
     pocet = 0
     for fn1, fn2 in ops.items():
         if not fn2:
-            click.echo("Unlink: %s" % (fn1))
+            click.echo(f"Unlink: {fn1}")
             unlinkdir(os.path.join(backup_path, fn1))
             pocet += 1
             continue
         if fn1==fn2:
             # print("NOP %s" % (fn1))
             continue
-        click.echo("Rename %s -> %s" % (fn1, fn2))
+        click.echo(f"Rename {fn1} -> {fn2}")
         renamedir(os.path.join(backup_path, fn1), os.path.join(backup_path, fn2))
         pocet += 1
         continue
-    click.echo("Total %d ops" % (pocet))
-    return None
+    click.echo(f"Total {pocet} ops")
 
 def clearing(backup_path, cfg, section):
     PREFIX = "snapshot-"
@@ -144,9 +148,9 @@ def clearing(backup_path, cfg, section):
 
     DELETE_BAD_SNAPS = cfg.getboolean(section, "delete-unknown-snapshots", fallback=False)
 
-    snaps = dict()
+    snaps = {}
     nyni = dt.datetime.now()
-    ops = dict()
+    ops = {}
 
     for fn in os.listdir(backup_path):
         if fn == "mirror":
@@ -167,7 +171,7 @@ def clearing(backup_path, cfg, section):
     # 0) bad ones
     for fn, d in snaps.items():
         if len(d) != 12:
-            click.echo("bad: %s"%(fn))
+            click.echo(f"bad: {fn}")
             if DELETE_BAD_SNAPS:
                 ops[fn] = None
             else:
@@ -175,7 +179,7 @@ def clearing(backup_path, cfg, section):
             continue
 
         if not d.startswith("20"):
-            click.echo("bad prefix: %s" % (fn))
+            click.echo(f"bad prefix: {fn}")
             if DELETE_BAD_SNAPS:
                 ops[fn] = None
             else:
@@ -185,7 +189,7 @@ def clearing(backup_path, cfg, section):
 
     filtersnaps(snaps, ops)
     if len(snaps) != all_snaps_len:
-        click.echo("All good snaps count=%d" % (len(snaps)))
+        click.echo(f"All good snaps count={len(snaps)}")
 
     # 1) last 7 days
     d7 = nyni - dt.timedelta(days=LEAVE1_DAYS)
@@ -257,7 +261,7 @@ def clearing(backup_path, cfg, section):
 
     # handle REST
     for fn, d in sorted(snaps.items(), key=lambda x: x[1]):
-        click.echo("Reziduum: %s" % (fn))
+        click.echo(f"Reziduum: {fn}")
 
     # print("Operations (including NOP) counts=%d" % (len(ops)))
     # print(repr(ops))
@@ -265,43 +269,42 @@ def clearing(backup_path, cfg, section):
 
 
 def load_config(cfgfile):
-    cfg = configparser.SafeConfigParser()
+    cfg = configparser.ConfigParser()
     cfg.read(cfgfile)
     return cfg
 
 def check_backup_structure(pth):
     if not os.path.exists(pth):
         click.echo()
-        raise CriException("Path %s does not exists." % (pth))
+        raise CriException(f"Path {pth} does not exists.")
     m1 = os.path.join(pth, "mirror")
     if not os.path.exists(m1):
         os.mkdir(m1)
-    return
 
 def exec_and_get_stdout(cmd):
-    p = subprocess.Popen(cmd, shell=True,
+    # Note: shell=True is intentional for command expansion (date, awk, etc.)
+    # Commands are constructed internally, not from user input
+    with subprocess.Popen(cmd, shell=True,  # nosec B602
             stdin=None, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-    (_, w) = (p.stdin, p.stdout)
-    result = "".join(i.decode("utf-8") for i in w.readlines())
-    result = result.strip()
-    w.close()
+            stderr=subprocess.STDOUT) as p:
+        result = "".join(i.decode("utf-8") for i in p.stdout.readlines())
+        result = result.strip()
     return result
 
 def exec_and_get_lines(cmd):
-    p = subprocess.Popen(cmd, shell=True,
+    # Note: shell=True is intentional for command expansion (du, etc.)
+    # Commands are constructed internally, not from user input
+    with subprocess.Popen(cmd, shell=True,  # nosec B602
             stdin=None, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-    (_, w) = (p.stdin, p.stdout)
-    result = [i.decode("utf-8").strip() for i in w.readlines()]
-    w.close()
+            stderr=subprocess.STDOUT) as p:
+        result = [i.decode("utf-8").strip() for i in p.stdout.readlines()]
     return result
 
 
 def try_unlink(filename):
     try:
         os.unlink(filename)
-    except:
+    except OSError:
         pass
 
 def is_same_filesystem(pth1, pth2):
@@ -312,38 +315,35 @@ def is_same_filesystem(pth1, pth2):
         if fs1==fs2:
             click.echo("filesystems matched")
             return True
-        else:
-            click.echo("Filesystems differs[%s/%s]" % (fs1,fs2))
-            return False
+        click.echo(f"Filesystems differs[{fs1}/{fs2}]")
+        return False
 
-    click.echo("Filesystems unsure[%s/%s]" % (fs1,fs2))
+    click.echo(f"Filesystems unsure[{fs1}/{fs2}]")
     return False
 
 def snapshot_with_cp(src, dst, nice=False):
     click.echo("snapsthot_with_cp")
-    cmdr = "cp -al \"%s\" \"%s\"/snapshot-$(date '+%%Y%%m%%d%%H%%M')" % (src, dst)
+    cmdr = f"cp -al \"{src}\" \"{dst}\"/snapshot-$(date '+%%Y%%m%%d%%H%%M')"
     if nice:
         cmdr = NICE_PREFIX + cmdr
     res = exec_and_get_stdout(cmdr)
     click.echo(res)
-    return
 
 def backup_with_rsync(src, dst, nice=False):
     click.echo("backup_with_rsync")
     opts1=""
     opts2="--no-o --no-g --no-p --delete"
-    cmdr ="rsync -ax -u -v %s %s \"%s/\" \"%s/\"" % (opts1, opts2, src, dst)
+    cmdr = f"rsync -ax -u -v {opts1} {opts2} \"{src}/\" \"{dst}/\""
     if nice:
         cmdr = NICE_PREFIX + cmdr
     res = exec_and_get_stdout(cmdr)
     click.echo(res)
-    return
 
 
 
 @click.group()
 def cli():
-    """Aplication for managing backups and snapshots created via hard-links.
+    """Application for managing backups and snapshots created via hard-links.
 
 App manages efficiently directory structure of hard-link created
 backups of original data location. You can make backups every few hours,
@@ -357,7 +357,6 @@ Policy: - last 7 days - leave all untouched
  then: - leave 1 per month for 12 months
 
 """
-    pass
 
 @cli.command()
 @click.argument('cfgfile')
@@ -403,9 +402,9 @@ def status(location, cfgfile):
     MIRROR = os.path.join(BACKUP, "mirror")
 
     if is_same_filesystem(ORIGIN, MIRROR):
-        res = exec_and_get_lines("du \"%s\"/* \"%s\" -shc" % (BACKUP, ORIGIN))
+        res = exec_and_get_lines(f"du \"{BACKUP}\"/* \"{ORIGIN}\" -shc")
     else:
-        res = exec_and_get_lines("du \"%s\"/* -shc" % (BACKUP))
+        res = exec_and_get_lines(f"du \"{BACKUP}\"/* -shc")
 
     for line in res:
         if line.endswith("total"):
@@ -420,7 +419,7 @@ def listcommand(location, cfgfile):
     section = location
     BACKUP = cfg.get(section, "backup")
 
-    res = exec_and_get_lines("du \"%s\"/* -shc" % (BACKUP))
+    res = exec_and_get_lines(f"du \"{BACKUP}\"/* -shc")
 
     for line in res:
         click.echo(line)
